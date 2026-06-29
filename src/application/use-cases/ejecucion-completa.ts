@@ -83,7 +83,10 @@ export class EjecucionCompletaUseCase {
       documentos: scrapeResult.documentos,
       maxPdfs: cfg.maxPdfs ?? 'unlimited',
       retriesPerRow: cfg.retriesPerRow ?? downloadDeps.retriesPerRow ?? 5,
-      initialViewState: cfg.viewState,
+      // Importante: usar el ViewState rotado del scrape (no uno vacio).
+      // El server devuelve un 302 -> redirect a consultaInicio.xhtml
+      // si le mandamos ViewState vacio o uno del bootstrap.
+      initialViewState: cfg.viewState ?? scrapeResult.finalViewState,
       log: this.log,
     });
     const downloadResult = await downloadWithDocs.execute();

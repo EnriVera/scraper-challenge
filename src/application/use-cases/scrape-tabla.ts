@@ -28,6 +28,12 @@ export interface ScrapeTablaResult {
   readonly paginasProcesadas: number;
   readonly totalPaginas: number | null;
   readonly documentos: import('../../domain/entities').Documento[];
+  /**
+   * ViewState rotado tras el ultimo POST (buscar o paginator). Necesario
+   * para que `EjecucionCompletaUseCase` lo reenvie a `postDescargarPdf`
+   * (que requiere un ViewState valido, no uno vacio).
+   */
+  readonly finalViewState: string;
 }
 
 /**
@@ -171,6 +177,7 @@ export class ScrapeTablaUseCase {
       paginasProcesadas,
       totalPaginas,
       documentos: allDocumentos,
+      finalViewState: viewState,
     };
   }
 }
