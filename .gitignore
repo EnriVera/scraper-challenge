@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime data
+data/
+!data/.gitkeep
+
+# Logs
+*.log
+data/logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Temp / atomic write leftovers
+*.tmp

@@ -1,0 +1,34 @@
+{
+  "name": "scraper-challenge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scraper TypeScript para el portal publico del OEFA. Sin browser automation.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main/cli.js",
+    "scrape": "node dist/main/cli.js scrape",
+    "retry": "node dist/main/cli.js retry",
+    "stats": "node dist/main/cli.js stats",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cheerio": "^1.0.0",
+    "commander": "^12.1.0",
+    "p-limit": "^6.1.0",
+    "tough-cookie": "^4.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.5",
+    "@types/tough-cookie": "^4.0.5",
+    "@vitest/coverage-v8": "^2.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  }
+}
