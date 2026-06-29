@@ -12,6 +12,7 @@
     "scrape": "node dist/main/cli.js scrape",
     "retry": "node dist/main/cli.js retry",
     "stats": "node dist/main/cli.js stats",
+    "smoke": "node dist/main/smoke.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
