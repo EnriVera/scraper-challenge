@@ -122,7 +122,7 @@ export async function buildContainer(config: AppConfig): Promise<Container> {
     store,
     log: logger,
     paths: pathBuilder,
-    retriesPerRow: config.retries,
+    retriesPerRow: config.retries + 1,
   };
   const download = new DescargarPdfsUseCase(downloadDeps);
   const retryUC = new ReintentarFallidosUseCase(downloadDeps);

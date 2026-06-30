@@ -22,8 +22,13 @@ export interface IBackoff {
  * uso al envolver una operacion HTTP en el `IRetryRunner`.
  */
 export interface RetryOpts {
-  /** Numero maximo de reintentos (1 = solo el intento inicial). */
-  readonly maxAttempts: number;
+  /**
+   * Numero de reintentos **despues del intento inicial**.
+   * Total de attempts observados = `retries + 1`.
+   * Default CLI: 5 reintentos -> 6 attempts totales
+   * (ver `specs/manejo-rate-limit §Retry Budget Per Request`).
+   */
+  readonly retries: number;
   /** Politica de espera (ver `IBackoff`). */
   readonly backoff: IBackoff;
   /** Scheduler compartido; serializa los reintentos para no fan-out. */

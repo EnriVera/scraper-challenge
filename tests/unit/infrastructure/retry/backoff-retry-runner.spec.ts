@@ -13,7 +13,7 @@ const noopSleeper: (ms: number) => Promise<void> = async () => {};
 
 function buildOpts(overrides: Partial<RetryOpts> = {}): RetryOpts {
   return {
-    maxAttempts: 3,
+    retries: 2, // -> 3 total attempts (default fixture)
     backoff: constantBackoff(0),
     scheduler: {
       schedule: <T>(fn: () => Promise<T>): Promise<T> => fn(),
@@ -44,7 +44,7 @@ describe('BackoffRetryRunner', () => {
       return 'ok';
     });
 
-    const result = await runner.run(op, buildOpts({ backoff, maxAttempts: 3 }));
+    const result = await runner.run(op, buildOpts({ backoff, retries: 2 }));
     expect(result).toBe('ok');
     expect(op).toHaveBeenCalledTimes(3);
     expect(backoff.nextDelayMs).toHaveBeenCalledWith(
@@ -61,7 +61,7 @@ describe('BackoffRetryRunner', () => {
       if (calls < 2) throw new TransientHttpError(502, 'Bad Gateway');
       return 'ok';
     });
-    const result = await runner.run(op, buildOpts({ maxAttempts: 3 }));
+    const result = await runner.run(op, buildOpts({ retries: 2 }));
     expect(result).toBe('ok');
     expect(op).toHaveBeenCalledTimes(2);
   });
@@ -84,31 +84,42 @@ describe('BackoffRetryRunner', () => {
       throw new RateLimitedError(null, 'always 429');
     });
     await expect(
-      runner.run(op, buildOpts({ maxAttempts: 3 })),
+      runner.run(op, buildOpts({ retries: 2 })),
     ).rejects.toBeInstanceOf(RateLimitedError);
-    expect(op).toHaveBeenCalledTimes(3);
+    expect(op).toHaveBeenCalledTimes(3); // retries=2 -> 3 total attempts
   });
 
-  it('custom budget: maxAttempts=2 -> max 2 intentos', async () => {
+  it('custom budget: retries=1 -> max 2 intentos (1 + 1)', async () => {
     const runner = new BackoffRetryRunner(noopSleeper);
     const op = vi.fn(async () => {
       throw new TransientHttpError(503, 'down');
     });
     await expect(
-      runner.run(op, buildOpts({ maxAttempts: 2 })),
+      runner.run(op, buildOpts({ retries: 1 })),
     ).rejects.toBeInstanceOf(TransientHttpError);
     expect(op).toHaveBeenCalledTimes(2);
   });
 
-  it('default budget=5 -> max 5 intentos', async () => {
+  it('default budget: retries=5 -> 6 total attempts (spec §Default budget yields 6 total)', async () => {
     const runner = new BackoffRetryRunner(noopSleeper);
     const op = vi.fn(async () => {
       throw new RateLimitedError(null, 'always 429');
     });
     await expect(
-      runner.run(op, buildOpts({ maxAttempts: 5 })),
+      runner.run(op, buildOpts({ retries: 5 })),
     ).rejects.toBeInstanceOf(RateLimitedError);
-    expect(op).toHaveBeenCalledTimes(5);
+    expect(op).toHaveBeenCalledTimes(6); // retries=5 -> 6 total
+  });
+
+  it('custom retries: retries=2 -> 3 total attempts (spec §Custom retries yield retries+1)', async () => {
+    const runner = new BackoffRetryRunner(noopSleeper);
+    const op = vi.fn(async () => {
+      throw new RateLimitedError(null, 'always 429');
+    });
+    await expect(
+      runner.run(op, buildOpts({ retries: 2 })),
+    ).rejects.toBeInstanceOf(RateLimitedError);
+    expect(op).toHaveBeenCalledTimes(3);
   });
 
   it('onRetry hook se llama con attempt + delayMs + error antes de cada sleep', async () => {
@@ -122,7 +133,7 @@ describe('BackoffRetryRunner', () => {
     });
     const result = await runner.run(
       op,
-      buildOpts({ backoff: constantBackoff(2_500), maxAttempts: 3, onRetry }),
+      buildOpts({ backoff: constantBackoff(2_500), retries: 2, onRetry }),
     );
     expect(result).toBe('ok');
     expect(onRetry).toHaveBeenCalledTimes(2);
@@ -145,17 +156,17 @@ describe('BackoffRetryRunner', () => {
       throw new RateLimitedError(null, 'throttled');
     });
     await expect(
-      runner.run(op, buildOpts({ maxAttempts: 2 })),
+      runner.run(op, buildOpts({ retries: 1 })),
     ).rejects.toBeInstanceOf(RateLimitedError);
     expect(sleepMock).toHaveBeenCalledTimes(1);
     expect(sleepMock).toHaveBeenCalledWith(0);
   });
 
-  it('rechaza maxAttempts < 1', async () => {
+  it('rechaza retries < 0', async () => {
     const runner = new BackoffRetryRunner(noopSleeper);
     await expect(
-      runner.run(async () => 'x', buildOpts({ maxAttempts: 0 })),
-    ).rejects.toThrow(/maxAttempts/);
+      runner.run(async () => 'x', buildOpts({ retries: -1 })),
+    ).rejects.toThrow(/retries/);
   });
 
   it('onRetry que lanza no tumba el retry loop', async () => {
@@ -171,7 +182,7 @@ describe('BackoffRetryRunner', () => {
     });
     const result = await runner.run(
       op,
-      buildOpts({ maxAttempts: 2, onRetry }),
+      buildOpts({ retries: 1, onRetry }),
     );
     expect(result).toBe('ok');
     expect(op).toHaveBeenCalledTimes(2);

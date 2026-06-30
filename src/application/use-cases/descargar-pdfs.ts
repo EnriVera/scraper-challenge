@@ -207,7 +207,7 @@ export class DescargarPdfsUseCase {
               return res.bodyBytes;
             },
             {
-              maxAttempts: retriesPerRow,
+              retries: retriesPerRow - 1, // spec: retries = total - 1
               backoff: this.deps.backoff,
               scheduler: this.deps.scheduler,
               isRetryable: isRetryableDownloadError,

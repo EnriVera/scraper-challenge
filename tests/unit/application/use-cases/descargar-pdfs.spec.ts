@@ -110,19 +110,20 @@ class IdentityScheduler implements IScheduler {
   }
 }
 
-/** Runner que respeta `maxAttempts` pero sin esperar tiempos reales. */
+/** Runner que respeta `retries` (semantica N reintentos -> N+1 attempts) sin esperar tiempos reales. */
 class FakeRetryRunner implements IRetryRunner {
   sleeper: (ms: number) => Promise<void> = async () => {};
 
   async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<T> {
     let lastError: unknown;
-    for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
+    const maxAttempts = opts.retries + 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         return await op(attempt);
       } catch (err) {
         lastError = err;
         if (!opts.isRetryable(err)) throw err;
-        if (attempt >= opts.maxAttempts) throw err;
+        if (attempt >= maxAttempts) throw err;
         const delay = opts.backoff.nextDelayMs(attempt);
         if (opts.onRetry) {
           try { opts.onRetry({ attempt, delayMs: delay, error: err }); } catch { /* noop */ }
