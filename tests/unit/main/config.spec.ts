@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseArgs, InvalidCliInputError } from '../../../src/main/config';
+import { handleError } from '../../../src/main/cli';
 import { buildContainer } from '../../../src/composition/container';
 import { SpyLogger } from '../support/noop-logger';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -53,6 +54,65 @@ describe('parseArgs', () => {
       expect(concurrencyWarns[0].msg).toContain('1');
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+it('handleError: VITEST=true suprime el banner de commander (spec §VITEST hides banner)', () => {
+    const originalVitest = process.env.VITEST;
+    const originalWrite = process.stderr.write;
+    const originalExit = process.exit;
+    let stderrBuf = '';
+    let exitCode = -1;
+
+    process.env.VITEST = 'true';
+    process.stderr.write = ((s: string) => {
+      stderrBuf += s;
+      return true;
+    }) as typeof process.stderr.write;
+    process.exit = ((code: number) => {
+      exitCode = code;
+      return undefined as never;
+    }) as typeof process.exit;
+
+    try {
+      handleError(new InvalidCliInputError('test error message'));
+      expect(stderrBuf).toContain('error: test error message');
+      expect(stderrBuf).not.toContain('Uso: scraper-oefa');
+      expect(exitCode).toBe(3);
+    } finally {
+      if (originalVitest === undefined) delete process.env.VITEST;
+      else process.env.VITEST = originalVitest;
+      process.stderr.write = originalWrite;
+      process.exit = originalExit;
+    }
+  });
+
+  it('handleError: VITEST unset mantiene el banner de commander (spec §VITEST unset preserves banner)', () => {
+    const originalVitest = process.env.VITEST;
+    const originalWrite = process.stderr.write;
+    const originalExit = process.exit;
+    let stderrBuf = '';
+    let exitCode = -1;
+
+    delete process.env.VITEST;
+    process.stderr.write = ((s: string) => {
+      stderrBuf += s;
+      return true;
+    }) as typeof process.stderr.write;
+    process.exit = ((code: number) => {
+      exitCode = code;
+      return undefined as never;
+    }) as typeof process.exit;
+
+    try {
+      handleError(new InvalidCliInputError('test error message'));
+      expect(stderrBuf).toContain('error: test error message');
+      expect(stderrBuf).toContain('Uso: scraper-oefa');
+      expect(exitCode).toBe(3);
+    } finally {
+      if (originalVitest !== undefined) process.env.VITEST = originalVitest;
+      process.stderr.write = originalWrite;
+      process.exit = originalExit;
     }
   });
 
