@@ -161,14 +161,20 @@ function tee(a: ILogger, b: ILogger): ILogger {
 /**
  * Aplica la politica de concurrency del spec: solo se permite 1; si
  * el caller pide mas, se loguea warning y se clampea.
+ *
+ * El mensaje de warning lleva ambos valores (requested + clamped=1) por
+ * `specs/scraping-oefa §Clamp warning carries the original value`.
  */
 async function enforceConcurrency(requested: number, logger: ILogger): Promise<number> {
   if (!Number.isInteger(requested) || requested < 1) {
-    logger.warn('concurrency invalida, default 1', { requested });
+    logger.warn('concurrency invalida, default 1', { requested, clamped: 1 });
     return 1;
   }
   if (requested > 1) {
-    logger.warn('concurrency>1 rechazada por spec, clamp a 1', { requested });
+    logger.warn(
+      `concurrency requested=${requested}, clamped to 1 (spec)`,
+      { requested, clamped: 1 },
+    );
     return 1;
   }
   return requested;

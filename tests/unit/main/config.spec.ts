@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { parseArgs, InvalidCliInputError } from '../../../src/main/config';
+import { buildContainer } from '../../../src/composition/container';
+import { SpyLogger } from '../support/noop-logger';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 describe('parseArgs', () => {
   it('default sector es TODOS', () => {
@@ -24,6 +29,31 @@ describe('parseArgs', () => {
   it('--concurrency 4 se clampea a 1', () => {
     const cfg = parseArgs(['node', 'cli', 'scrape', '--concurrency', '4']);
     expect(cfg.concurrency).toBe(1);
+  });
+
+  it('--concurrency 8 en container emite exactamente 1 warning con requested=8 y clamped=1 (spec §Clamp warning)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'cfg-w3-'));
+    try {
+      const logger = new SpyLogger();
+      await buildContainer({
+        sector: 'TODOS',
+        maxPdfs: 'unlimited',
+        retries: 5,
+        concurrency: 8,
+        dataDir: dir,
+        delayBetweenRequestsMs: 500,
+        startedAt: new Date(),
+        logger,
+      });
+      const concurrencyWarns = logger.calls.filter(
+        (c) => c.level === 'warn' && c.msg.toLowerCase().includes('concurrency'),
+      );
+      expect(concurrencyWarns).toHaveLength(1);
+      expect(concurrencyWarns[0].msg).toContain('8');
+      expect(concurrencyWarns[0].msg).toContain('1');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('--max-pdfs unlimited se acepta', () => {
