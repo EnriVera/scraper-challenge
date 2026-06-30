@@ -59,6 +59,34 @@ describe('JsonDataStore', () => {
     }
   });
 
+  it('ensureDirs materializes fallidos.json como [] en corrida limpia (spec §Initial run)', async () => {
+    await store.ensureDirs();
+    const raw = await readFile(join(dir, 'json', 'fallidos.json'), 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toEqual([]);
+  });
+
+  it('ensureDirs preserva un fallidos.json existente con entradas previas (spec §Restart preserves)', async () => {
+    await store.ensureDirs();
+    // Simulamos un run previo: 3 entradas en fallidos.json.
+    const prev = [
+      { paramUuid: 'u1', reason: '429_agotado' },
+      { paramUuid: 'u2', reason: 'http_500' },
+      { paramUuid: 'u3', reason: 'magic_bytes_invalidos' },
+    ];
+    const fs = await import('node:fs/promises');
+    await fs.writeFile(join(dir, 'json', 'fallidos.json'), JSON.stringify(prev), 'utf8');
+
+    // Re-construimos el store (idempotencia) y llamamos ensureDirs de nuevo.
+    store = new JsonDataStore(dir, log);
+    await store.ensureDirs();
+
+    const all = await store.readFallidos();
+    expect(all).toHaveLength(3);
+    expect(all.map((f) => f.paramUuid).sort()).toEqual(['u1', 'u2', 'u3']);
+  });
+
   it('readDocumentos devuelve [] cuando el archivo no existe', async () => {
     expect(await store.readDocumentos()).toEqual([]);
   });
