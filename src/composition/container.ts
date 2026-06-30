@@ -84,7 +84,11 @@ export async function buildContainer(config: AppConfig): Promise<Container> {
     timeout: 60_000,
     responseType: 'arraybuffer',
   });
-  const http = new OefaHttpClient({ axios: axiosInstance, log: logger });
+  const http = new OefaHttpClient({
+    axios: axiosInstance,
+    log: logger,
+    delayBetweenRequestsMs: config.delayBetweenRequestsMs,
+  });
 
   // 3. Parsers.
   const grid = new OefaGridParser();
