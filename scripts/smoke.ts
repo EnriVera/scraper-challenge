@@ -16,13 +16,18 @@
  *   2 - bootstrap fatal
  *   3 - input invalido
  *   4 - MalformedHtml
+ *
+ * Ubicacion: este archivo vive en `scripts/` (no en `src/`) para que
+ * `tsconfig.json` no necesite `rootDir: "src"` y el build no incluya
+ * tooling en `dist/`. Se ejecuta con `tsx scripts/smoke.ts` (ver
+ * `package.json#scripts.smoke`).
  */
-import { buildContainer } from '../composition/container';
-import { buildRunId } from '../application/use-cases';
-import type { Sector } from '../domain/entities';
-import { SECTORS_VALIDOS } from '../domain/sector-map';
-import { formatStats } from './emit-stats';
-import { exitCodeFor, processExit } from './exit-codes';
+import { buildContainer } from '../src/composition/container';
+import { buildRunId } from '../src/application/use-cases';
+import type { Sector } from '../src/domain/entities';
+import { SECTORS_VALIDOS } from '../src/domain/sector-map';
+import { formatStats } from '../src/main/emit-stats';
+import { exitCodeFor, processExit } from '../src/main/exit-codes';
 
 interface SmokeArgs {
   sector: Sector;

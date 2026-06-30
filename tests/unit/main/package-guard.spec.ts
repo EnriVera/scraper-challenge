@@ -68,4 +68,10 @@ describe('package-guard', () => {
     expect(deps).toHaveProperty('axios');
     expect(deps).toHaveProperty('cheerio');
   });
+
+  it('smoke script no apunta a src/main/smoke (post-entrega-polish §S5)', () => {
+    const pkg = loadPackageJson() as PackageJson & { scripts?: Record<string, string> };
+    const smoke = pkg.scripts?.smoke ?? '';
+    expect(smoke).not.toContain('src/main/smoke');
+  });
 });
