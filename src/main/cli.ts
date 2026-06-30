@@ -65,11 +65,13 @@ program
   .description('Lee stats.json + fallidos.json y emite resumen')
   .option('--format <FORMAT>', 'json|table', 'json')
   .option('--data-dir <PATH>', 'directorio de datos (default data)')
+  .option('--verbose', 'dump status breakdown from documentos.json')
   .action(async (opts: Record<string, unknown>) => {
     try {
       const cfg = parseArgs(['node', 'cli', 'stats', ...flagPairs(opts)]);
       const format = (opts.format as 'json' | 'table') ?? 'json';
-      await runStats(cfg, format);
+      const verbose = Boolean(opts.verbose);
+      await runStats(cfg, format, verbose);
     } catch (err) {
       handleError(err);
     }
