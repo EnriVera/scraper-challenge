@@ -1,4 +1,9 @@
-import type { IBackoff, IRetryRunner, RetryOpts } from '../../domain/ports';
+import type {
+  IBackoff,
+  IRetryRunner,
+  RetryOpts,
+  RetryResult,
+} from '../../domain/ports';
 
 /**
  * Inyector de "sleep" para que los tests no esperen milisegundos reales.
@@ -36,7 +41,7 @@ export class BackoffRetryRunner implements IRetryRunner {
     this.sleeper = sleeper;
   }
 
-  async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<T> {
+  async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<RetryResult<T>> {
     if (opts.retries < 0) {
       throw new Error(
         `BackoffRetryRunner: retries must be >= 0, got ${opts.retries}`,
@@ -45,11 +50,15 @@ export class BackoffRetryRunner implements IRetryRunner {
     const maxAttempts = opts.retries + 1; // total attempts = retries + 1 (spec)
 
     let lastError: unknown;
+    let finalAttempts = 0;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await op(attempt);
+        const value = await op(attempt);
+        finalAttempts = attempt;
+        return { value, attempts: finalAttempts };
       } catch (err) {
         lastError = err;
+        finalAttempts = attempt;
 
         if (!opts.isRetryable(err)) {
           throw err;

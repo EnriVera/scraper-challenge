@@ -114,12 +114,13 @@ class IdentityScheduler implements IScheduler {
 class FakeRetryRunner implements IRetryRunner {
   sleeper: (ms: number) => Promise<void> = async () => {};
 
-  async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<T> {
+  async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<{ value: T; attempts: number }> {
     let lastError: unknown;
     const maxAttempts = opts.retries + 1;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await op(attempt);
+        const value = await op(attempt);
+        return { value, attempts: attempt };
       } catch (err) {
         lastError = err;
         if (!opts.isRetryable(err)) throw err;

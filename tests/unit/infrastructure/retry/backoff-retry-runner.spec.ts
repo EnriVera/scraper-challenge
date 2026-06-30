@@ -29,7 +29,8 @@ describe('BackoffRetryRunner', () => {
     const runner = new BackoffRetryRunner(noopSleeper);
     const op = vi.fn(async () => 'ok');
     const result = await runner.run(op, buildOpts());
-    expect(result).toBe('ok');
+    expect(result.value).toBe('ok');
+    expect(result.attempts).toBe(1);
     expect(op).toHaveBeenCalledTimes(1);
     expect(op).toHaveBeenCalledWith(1);
   });
@@ -45,7 +46,8 @@ describe('BackoffRetryRunner', () => {
     });
 
     const result = await runner.run(op, buildOpts({ backoff, retries: 2 }));
-    expect(result).toBe('ok');
+    expect(result.value).toBe('ok');
+    expect(result.attempts).toBe(3);
     expect(op).toHaveBeenCalledTimes(3);
     expect(backoff.nextDelayMs).toHaveBeenCalledWith(
       expect.any(Number),
@@ -62,7 +64,8 @@ describe('BackoffRetryRunner', () => {
       return 'ok';
     });
     const result = await runner.run(op, buildOpts({ retries: 2 }));
-    expect(result).toBe('ok');
+    expect(result.value).toBe('ok');
+    expect(result.attempts).toBe(2);
     expect(op).toHaveBeenCalledTimes(2);
   });
 
@@ -122,6 +125,24 @@ describe('BackoffRetryRunner', () => {
     expect(op).toHaveBeenCalledTimes(3);
   });
 
+  it('run returns { value, attempts } wrapper (spec §run() returns attempts wrapper)', async () => {
+    const runner = new BackoffRetryRunner(noopSleeper);
+    let calls = 0;
+    const op = vi.fn(async () => {
+      calls++;
+      if (calls < 2) throw new RateLimitedError(1_000, '429!');
+      return 'ok';
+    });
+    const result = await runner.run(op, buildOpts({ retries: 2 }));
+    expect(result).toEqual({ value: 'ok', attempts: 2 });
+  });
+
+  it('single-shot success yields attempts=1 (spec §Single-shot)', async () => {
+    const runner = new BackoffRetryRunner(noopSleeper);
+    const result = await runner.run(async () => 'ok', buildOpts({ retries: 5 }));
+    expect(result).toEqual({ value: 'ok', attempts: 1 });
+  });
+
   it('onRetry hook se llama con attempt + delayMs + error antes de cada sleep', async () => {
     const runner = new BackoffRetryRunner(noopSleeper);
     const onRetry = vi.fn();
@@ -135,7 +156,7 @@ describe('BackoffRetryRunner', () => {
       op,
       buildOpts({ backoff: constantBackoff(2_500), retries: 2, onRetry }),
     );
-    expect(result).toBe('ok');
+    expect(result.value).toBe('ok');
     expect(onRetry).toHaveBeenCalledTimes(2);
     expect(onRetry).toHaveBeenNthCalledWith(1, {
       attempt: 1,
@@ -184,7 +205,7 @@ describe('BackoffRetryRunner', () => {
       op,
       buildOpts({ retries: 1, onRetry }),
     );
-    expect(result).toBe('ok');
+    expect(result.value).toBe('ok');
     expect(op).toHaveBeenCalledTimes(2);
   });
 });

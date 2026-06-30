@@ -104,7 +104,7 @@ export class EjecucionCompletaUseCase {
       documentosPendientes: downloadResult.pending,
       pdfsSaltados: downloadResult.pdfsSaltados,
       pdfsDescargados: downloadResult.pdfsDescargados,
-      reintentosTotales: 0, // se incrementa cuando el retry layer reporta
+      reintentosTotales: downloadResult.reintentosTotales,
     };
 
     await this.stats.record(stats, cfg.dataDir);

@@ -44,9 +44,17 @@ export interface RetryOpts {
 /**
  * Ejecuta una operacion `op` con reintentos. Por defecto solo se
  * reintentan los errores que cumplen `isRetryable`; el resto se
- * propagan de inmediato. Al agotar `maxAttempts`, se relanza el
- * ultimo error.
+ * propagan de inmediato. Al agotar `retries`, se relanza el ultimo error.
+ *
+ * El resultado expone `value` y `attempts` (total: 1 inicial + N reintentos).
+ * Ver `specs/manejo-rate-limit §Surface Retry Attempt Counter`.
  */
+export interface RetryResult<T> {
+  readonly value: T;
+  /** Total de attempts consumidos (1 = single-shot, N = retries+1). */
+  readonly attempts: number;
+}
+
 export interface IRetryRunner {
-  run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<T>;
+  run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<RetryResult<T>>;
 }
