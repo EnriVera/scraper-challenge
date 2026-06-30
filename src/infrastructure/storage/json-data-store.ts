@@ -36,6 +36,23 @@ export class JsonDataStore implements IDataStore {
       await fs.mkdir(d, { recursive: true });
     }
     await cleanupStaleTmp(join(this.dataDir, 'json'));
+    await this.initFallidosFile();
+  }
+
+  /**
+   * Materializa `data/json/fallidos.json` como un array vacio valido (`[]`)
+   * si el archivo no existe. Idempotente: nunca sobrescribe un archivo
+   * existente (ver `specs/persistencia-datos §Data Directory Layout`).
+   */
+  private async initFallidosFile(): Promise<void> {
+    try {
+      await fs.access(this.fallidosPath);
+      // Ya existe: NO tocar (preservar historial).
+      return;
+    } catch {
+      // No existe: materializar como [].
+      await writeJsonAtomic(this.fallidosPath, []);
+    }
   }
 
   async readDocumentos(): Promise<DocumentoPersistido[]> {

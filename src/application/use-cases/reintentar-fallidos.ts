@@ -51,6 +51,7 @@ export class ReintentarFallidosUseCase {
         pdfsDescargados: 0,
         pending: 0,
         fallidos,
+        reintentosTotales: 0,
       };
     }
 

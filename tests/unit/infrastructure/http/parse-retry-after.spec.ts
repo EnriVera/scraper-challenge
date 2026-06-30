@@ -26,12 +26,6 @@ describe('parseRetryAfter', () => {
     expect(parseRetryAfter('   ')).toBeNull();
   });
 
-  it('devuelve null para valores no numericos (HTTP-date o basura)', () => {
-    // Sin parser de HTTP-date por ahora (design §10 issue 3).
-    expect(parseRetryAfter('Wed, 21 Oct 2015 07:28:00 GMT')).toBeNull();
-    expect(parseRetryAfter('not-a-number')).toBeNull();
-  });
-
   it('trunca fracciones a milisegundos enteros', () => {
     expect(parseRetryAfter('1.5')).toBe(1500);
     expect(parseRetryAfter('0.25')).toBe(250);
@@ -44,5 +38,27 @@ describe('parseRetryAfter', () => {
   it('numeros negativos devuelven null', () => {
     // No es un valor valido; caemos al fallback del backoff.
     expect(parseRetryAfter('-5')).toBeNull();
+  });
+
+  it('HTTP-date futura devuelve ms positivos hasta la fecha objetivo (spec §HTTP-date is parsed)', () => {
+    const now = Date.parse('Wed, 21 Oct 2026 07:27:30 GMT');
+    expect(parseRetryAfter('Wed, 21 Oct 2026 07:28:00 GMT', now)).toBe(30_000);
+  });
+
+  it('HTTP-date en el pasado devuelve 0 ms (spec §Past returns 0)', () => {
+    const now = Date.parse('Wed, 21 Oct 2026 07:28:00 GMT');
+    expect(parseRetryAfter('Wed, 21 Oct 2026 07:27:00 GMT', now)).toBe(0);
+  });
+
+  it('HTTP-date con delta > 120s se clampea a 120000 ms (spec §Exceeds cap is clamped)', () => {
+    const now = Date.parse('Wed, 21 Oct 2026 07:00:00 GMT');
+    // 10 minutos en el futuro -> debe clampear.
+    expect(parseRetryAfter('Wed, 21 Oct 2026 07:10:00 GMT', now)).toBe(120_000);
+  });
+
+  it('HTTP-date malformada devuelve null y el backoff hace fallback (spec §Malformed falls back)', () => {
+    const now = Date.parse('Wed, 21 Oct 2026 07:28:00 GMT');
+    expect(parseRetryAfter('not-a-date', now)).toBeNull();
+    expect(parseRetryAfter('Wed, 99 Oct 9999 99:99:99 GMT', now)).toBeNull();
   });
 });

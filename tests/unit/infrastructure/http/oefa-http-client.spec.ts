@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { OefaHttpClient } from '../../../../src/infrastructure/http/oefa-http-client';
@@ -243,6 +243,54 @@ describe('OefaHttpClient', () => {
       await expect(
         client.postDescargarPdf(LONG_VIEW_STATE, 'sid', ''),
       ).rejects.toThrow(/paramUuid/);
+    });
+
+    it('delayBetweenRequestsMs=50 invoca sleeper(50) tras respuesta exitosa (spec §Positive delay)', async () => {
+      const sleeper = vi.fn(async () => {});
+      const instance = axios.create({ baseURL: 'https://publico.oefa.gob.pe' });
+      const mock = new MockAdapter(instance);
+      mock.onPost('/repdig/consulta/consultaTfa.xhtml').reply(200, PDF_BYTES, {
+        'Content-Type': 'application/octet-stream',
+      });
+      const c = new OefaHttpClient({
+        axios: instance,
+        log: new ConsoleLogger({ stderr: true }),
+        baseURL: 'https://publico.oefa.gob.pe',
+        delayBetweenRequestsMs: 50,
+        sleeper,
+      });
+
+      await c.postDescargarPdf(
+        LONG_VIEW_STATE,
+        'listarDetalleInfraccionRAAForm:dt:0:j_idt63',
+        'uuid-1',
+      );
+
+      expect(sleeper).toHaveBeenCalledWith(50);
+    });
+
+    it('delayBetweenRequestsMs=0 NO invoca sleeper (spec §Default delay is zero)', async () => {
+      const sleeper = vi.fn(async () => {});
+      const instance = axios.create({ baseURL: 'https://publico.oefa.gob.pe' });
+      const mock = new MockAdapter(instance);
+      mock.onPost('/repdig/consulta/consultaTfa.xhtml').reply(200, PDF_BYTES, {
+        'Content-Type': 'application/octet-stream',
+      });
+      const c = new OefaHttpClient({
+        axios: instance,
+        log: new ConsoleLogger({ stderr: true }),
+        baseURL: 'https://publico.oefa.gob.pe',
+        delayBetweenRequestsMs: 0,
+        sleeper,
+      });
+
+      await c.postDescargarPdf(
+        LONG_VIEW_STATE,
+        'listarDetalleInfraccionRAAForm:dt:0:j_idt63',
+        'uuid-2',
+      );
+
+      expect(sleeper).not.toHaveBeenCalled();
     });
   });
 

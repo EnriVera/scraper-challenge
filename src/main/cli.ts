@@ -65,11 +65,13 @@ program
   .description('Lee stats.json + fallidos.json y emite resumen')
   .option('--format <FORMAT>', 'json|table', 'json')
   .option('--data-dir <PATH>', 'directorio de datos (default data)')
+  .option('--verbose', 'dump status breakdown from documentos.json')
   .action(async (opts: Record<string, unknown>) => {
     try {
       const cfg = parseArgs(['node', 'cli', 'stats', ...flagPairs(opts)]);
       const format = (opts.format as 'json' | 'table') ?? 'json';
-      await runStats(cfg, format);
+      const verbose = Boolean(opts.verbose);
+      await runStats(cfg, format, verbose);
     } catch (err) {
       handleError(err);
     }
@@ -93,12 +95,22 @@ function kebab(s: string): string {
   return s.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
-function handleError(err: unknown): void {
+/**
+ * Maneja errores thrown por el CLI. En modo test (VITEST=true|1)
+ * suprime el banner `\nUso: ...` para mantener el output del test
+ * legible (ver `specs/repo-hygiene §Commander Banner Suppressed In
+ * Test Runner`). Solo afecta la rama `InvalidCliInputError`; los
+ * errores de runtime siguen emitiendo su mensaje completo a stderr.
+ *
+ * Exportada para tests.
+ */
+export function handleError(err: unknown): void {
   if (err instanceof InvalidCliInputError) {
     process.stderr.write(`error: ${err.message}\n`);
-    process.stderr.write(
-      `\nUso: scraper-oefa scrape|retry|stats --help\n`,
-    );
+    const isTest = process.env.VITEST === 'true' || process.env.VITEST === '1';
+    if (!isTest) {
+      process.stderr.write(`\nUso: scraper-oefa scrape|retry|stats --help\n`);
+    }
     process.exit(3);
     return;
   }
@@ -106,6 +118,13 @@ function handleError(err: unknown): void {
   process.exit(exitCodeFor(err));
 }
 
-program.parseAsync(process.argv).catch((err) => {
-  handleError(err);
-});
+// Auto-run solo cuando el archivo es el entrypoint del proceso (no cuando
+// se importa desde un test, donde `process.argv[1]` apunta al test runner).
+// Ver `specs/repo-hygiene §Commander Banner Suppressed In Test Runner`.
+const isMainModule =
+  typeof require !== 'undefined' && require.main === module;
+if (isMainModule) {
+  program.parseAsync(process.argv).catch((err) => {
+    handleError(err);
+  });
+}

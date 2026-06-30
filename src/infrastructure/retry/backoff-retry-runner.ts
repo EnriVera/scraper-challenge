@@ -1,4 +1,9 @@
-import type { IBackoff, IRetryRunner, RetryOpts } from '../../domain/ports';
+import type {
+  IBackoff,
+  IRetryRunner,
+  RetryOpts,
+  RetryResult,
+} from '../../domain/ports';
 
 /**
  * Inyector de "sleep" para que los tests no esperen milisegundos reales.
@@ -18,18 +23,16 @@ const defaultSleeper: Sleeper = (ms) => new Promise((resolve) => setTimeout(reso
  *   3. exito -> retorna
  *   4. fallo:
  *      a. si !isRetryable(err) -> throw err (no se reintenta)
- *      b. si attempt >= maxAttempts -> throw err (presupuesto agotado)
+ *      b. si attempt > retries -> throw err (presupuesto agotado)
  *      c. delay = backoff.nextDelayMs(attempt, { retryAfterMs: err.retryAfterMs })
  *      d. logger?.warn / onRetry
  *      e. sleep(delay)
  *      f. attempt++, volver a 2
  *
  * El `attempt` que recibe `op` es 1-based (1 = primer intento).
- * El presupuesto es `maxAttempts` TOTAL: con default 5 hay hasta
- * 5 intentos (1 inicial + 4 retries) NO 6 como dice el spec
- * ("max 6 attempts" se interpreta como maxAttempts=5 en el spec
- * deltas; ver `manejo-rate-limit §Default budget of 5`: 1 initial + 5 retries).
- * Ver `backoff-retry-runner.spec.ts` para los limites exactos.
+ * El campo `opts.retries` cuenta **reintentos despues del inicial**:
+ * total de attempts observados = `retries + 1` (spec
+ * `manejo-rate-limit §Retry Budget Per Request`).
  */
 export class BackoffRetryRunner implements IRetryRunner {
   private readonly sleeper: Sleeper;
@@ -38,24 +41,29 @@ export class BackoffRetryRunner implements IRetryRunner {
     this.sleeper = sleeper;
   }
 
-  async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<T> {
-    if (opts.maxAttempts < 1) {
+  async run<T>(op: (attempt: number) => Promise<T>, opts: RetryOpts): Promise<RetryResult<T>> {
+    if (opts.retries < 0) {
       throw new Error(
-        `BackoffRetryRunner: maxAttempts must be >= 1, got ${opts.maxAttempts}`,
+        `BackoffRetryRunner: retries must be >= 0, got ${opts.retries}`,
       );
     }
+    const maxAttempts = opts.retries + 1; // total attempts = retries + 1 (spec)
 
     let lastError: unknown;
-    for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
+    let finalAttempts = 0;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        return await op(attempt);
+        const value = await op(attempt);
+        finalAttempts = attempt;
+        return { value, attempts: finalAttempts };
       } catch (err) {
         lastError = err;
+        finalAttempts = attempt;
 
         if (!opts.isRetryable(err)) {
           throw err;
         }
-        if (attempt >= opts.maxAttempts) {
+        if (attempt >= maxAttempts) {
           // Presupuesto agotado: propagar el ultimo error.
           throw err;
         }
@@ -75,7 +83,7 @@ export class BackoffRetryRunner implements IRetryRunner {
             attempt,
             nextAttempt: attempt + 1,
             delayMs,
-            maxAttempts: opts.maxAttempts,
+            retries: opts.retries,
             error: serializeError(err),
           });
         }

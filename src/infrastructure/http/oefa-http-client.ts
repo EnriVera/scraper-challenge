@@ -14,6 +14,14 @@ import { parseRetryAfter } from './parse-retry-after';
 import { extractViewState } from './view-state-extractor';
 
 /**
+ * Inyector de "sleep" para que `delayBetweenRequestsMs` no haga
+ * esperar milisegundos reales en tests. Default: `setTimeout`.
+ */
+export type Sleeper = (ms: number) => Promise<void>;
+const defaultSleeper: Sleeper = (ms) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * Cliente HTTP para el portal OEFA (`publico.oefa.gob.pe`). Implementa
  * `IHttpClient` (ver `design.md §4.1` y `specs/scraping-oefa`).
  *
@@ -41,16 +49,22 @@ export class OefaHttpClient implements IHttpClient {
   private readonly log: ILogger;
   private readonly cookieJar: CookieJar;
   private readonly baseURL: string;
+  private readonly delayBetweenRequestsMs: number;
+  private readonly sleeper: Sleeper;
   private currentViewState: string | null = null;
 
   constructor(opts: {
     axios?: AxiosInstance;
     log: ILogger;
     baseURL?: string;
+    delayBetweenRequestsMs?: number;
+    sleeper?: Sleeper;
   }) {
     this.log = opts.log;
     this.baseURL = opts.baseURL ?? 'https://publico.oefa.gob.pe';
     this.cookieJar = new CookieJar();
+    this.delayBetweenRequestsMs = opts.delayBetweenRequestsMs ?? 0;
+    this.sleeper = opts.sleeper ?? defaultSleeper;
 
     this.axios =
       opts.axios ??
@@ -217,7 +231,14 @@ export class OefaHttpClient implements IHttpClient {
     } catch (err) {
       throw mapAxiosError(err, this.log);
     }
-    return toHttpResult(response);
+    const result = toHttpResult(response);
+    // Delay entre requests (spec §CLI Surface Includes --delay-ms): solo
+    // se ejecuta despues de una respuesta exitosa (no en errores de red
+    // ni 4xx/5xx, donde el retry layer toma el control).
+    if (this.delayBetweenRequestsMs > 0) {
+      await this.sleeper(this.delayBetweenRequestsMs);
+    }
+    return result;
   }
 
   private updateViewStateFromResponse(response: HttpResult): void {

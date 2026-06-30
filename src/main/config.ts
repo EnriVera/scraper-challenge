@@ -46,7 +46,7 @@ export function parseArgs(argv: string[]): CliConfig {
   );
   cmd.option('--pages <N>', 'limitar paginas a iterar', (v: string) => parsePositiveInt(v, '--pages'));
   cmd.option('--max-pdfs <N|unlimited>', 'cap de PDFs (default unlimited)', parseMaxPdfs, 'unlimited');
-  cmd.option('--retries <N>', 'intentos por PDF (default 5)', (v: string) => parsePositiveInt(v, '--retries'), 5);
+  cmd.option('--retries <N>', 'intentos de reintento por PDF (default 5; total = N+1)', (v: string) => parsePositiveInt(v, '--retries'), 5);
   cmd.option('--concurrency <N>', 'concurrencia (forzado a 1; spec)', (v: string) => parsePositiveInt(v, '--concurrency'), 1);
   cmd.option('--delay-ms <N>', 'delay entre requests en ms (default 500)', (v: string) => parsePositiveInt(v, '--delay-ms'), 500);
   cmd.option('--data-dir <PATH>', 'directorio de datos (default data)', 'data');

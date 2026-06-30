@@ -63,6 +63,8 @@ export interface DescargarResult {
   readonly pdfsDescargados: number;
   readonly pending: number;
   readonly fallidos: Fallido[];
+  /** Suma de (attempts - 1) sobre todas las filas = reintentos consumidos. */
+  readonly reintentosTotales: number;
 }
 
 /**
@@ -98,6 +100,7 @@ export class DescargarPdfsUseCase {
     let pdfsDescargados = 0;
     let pending = 0;
     let attemptsUsed = 0;
+    let reintentosTotales = 0;
     const collectedFallidos: Fallido[] = [];
 
     for (const row of documentos) {
@@ -171,7 +174,7 @@ export class DescargarPdfsUseCase {
       let lastError: unknown = null;
 
       try {
-        await this.deps.scheduler.schedule(() =>
+        const { attempts: attemptsConsumed } = await this.deps.scheduler.schedule(() =>
           this.deps.retry.run(
             async () => {
               const res = await this.deps.http.postDescargarPdf(
@@ -207,7 +210,7 @@ export class DescargarPdfsUseCase {
               return res.bodyBytes;
             },
             {
-              maxAttempts: retriesPerRow,
+              retries: retriesPerRow - 1, // spec: retries = total - 1
               backoff: this.deps.backoff,
               scheduler: this.deps.scheduler,
               isRetryable: isRetryableDownloadError,
@@ -222,9 +225,14 @@ export class DescargarPdfsUseCase {
             },
           ),
         );
+        reintentosTotales += Math.max(0, attemptsConsumed - 1);
         downloadOk = true;
       } catch (err) {
         lastError = err;
+        // En el camino de fallo, contabilizamos el budget completo como
+        // reintentos consumidos (attempts - 1). Como el runner ya hizo
+        // throw, no tenemos acceso directo al counter; usamos retriesPerRow.
+        reintentosTotales += Math.max(0, retriesPerRow - 1);
       }
 
       attemptsUsed += 1;
@@ -273,6 +281,7 @@ export class DescargarPdfsUseCase {
       pdfsDescargados,
       pending,
       fallidos: collectedFallidos,
+      reintentosTotales,
     };
   }
 }

@@ -101,12 +101,13 @@ class IdentityScheduler implements IScheduler {
 }
 
 class FakeRetryRunner implements IRetryRunner {
-  async run<T>(op: (a: number) => Promise<T>, opts: RetryOpts): Promise<T> {
-    for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
-      try { return await op(attempt); }
+  async run<T>(op: (a: number) => Promise<T>, opts: RetryOpts): Promise<{ value: T; attempts: number }> {
+    const maxAttempts = opts.retries + 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try { const v = await op(attempt); return { value: v, attempts: attempt }; }
       catch (err) {
         if (!opts.isRetryable(err)) throw err;
-        if (attempt >= opts.maxAttempts) throw err;
+        if (attempt >= maxAttempts) throw err;
       }
     }
     throw new Error('unreachable');
@@ -285,6 +286,22 @@ describe('EjecucionCompletaUseCase', () => {
     expect(docsEnStoreCuandoDownloadArranca).toBe(3);
 
     void uc; // silence unused
+  });
+
+  it('reintentosTotales se popula desde downloadResult (spec §reintentosTotales aggregates)', async () => {
+    // Re-usamos el wiring base; el fake runner tiene retries=4 -> total=5,
+    // asi que un doc que NO se descarga pero SI consume attempts reporta
+    // attempts-1 = 4 reintentos.
+    const uc = new EjecucionCompletaUseCase(scrapeUC, downloadUC, stats, log);
+    await uc.run({
+      runId: 'run-r',
+      sector: 'PESQUERIA',
+      dataDir: '/tmp/test-data',
+      startedAt: new Date().toISOString(),
+    });
+    // 3 docs, todos bajan al primer intento (FakeHttpClient devuelve 200
+    // siempre), asi que reintentosTotales = 0.
+    expect(stats.recorded[0].reintentosTotales).toBe(0);
   });
 
   it('JsonStatsRecorder escribe el archivo real', async () => {
